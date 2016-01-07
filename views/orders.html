@@ -1,0 +1,12 @@
+<br>
+<div id="orderHistory" style="visibility: hidden">
+  <h2 style='text-align: center'><b>Order History</b></h2>
+  <br>
+  <h3 style='text-align: center' ng-if="ordersEmpty">No orders made yet!</h3>
+  <br>
+  <ul style='margin-left: 400px'>
+    <div ng-repeat="order in orders" style='display: inline-block'>
+      <li name="singleOrder" ng-id="{{order._id}}" style='margin-top:10px; border: 1px solid black; height:50px; width: 650px'><span style="display: inline-block"><b>{{order.cups}} cups of </b><b class='flavorBought'>{{order.flavor}}</b>-<b>${{order.price}}</b></span><button style='float: right' class="btn btn-success refund" ng-id="refundOrder{{order._id}}">Refund</button></li>
+    </div>
+  </ul>
+</div>

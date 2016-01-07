@@ -1,0 +1,27 @@
+<div id="container" style='width: 100%; height: auto; padding-left: 10px; text-align: center; visibility: hidden'>
+    <div ng-repeat='flavor in flavors' class="flavor" style="display: inline-block; width: 340px; height: 150px">
+      <div class="meta">
+        <span><span class='quantity'>{{flavor.quantity}}</span> left</span>
+        <span class="price">{{flavor.price}}</span>
+      </div>
+
+      <div class="description">
+        <h2>{{flavor.flavor}}</h2>
+        <p>{{flavor.description}}</p>
+      </div>
+
+    </div>
+</div>
+<div id="footer" style='float: left; height: 70px'>
+  <form action="">
+    I'd like to order
+    <input type="text" id="amount" />
+    cup(s) of
+    <select name="flavor">
+      <option>Example flavor</option>
+    </select>
+    <input id='submitOrder' type="submit" value="Finalize order &rarr;" />
+    <br>
+    <label style='visibility: hidden; color: red' id='errorMessage'>Error</label>
+  </form>
+</div>

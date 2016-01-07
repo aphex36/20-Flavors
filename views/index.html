@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>20 Flavors</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Raleway|Roboto:400,700|Ubuntu+Mono|Shadows+Into+Light" />
+    <link rel="stylesheet" href="https://dl.dropboxusercontent.com/u/374061708/normalize42.css" />
+    <link rel="stylesheet" href="https://dl.dropboxusercontent.com/u/374061708/style42.css" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.4.4/angular.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.4.4/angular-route.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://dl.dropboxusercontent.com/u/374061708/bootstrap.css" />
+    <script src="https://dl.dropboxusercontent.com/u/374061708/bootstrap.min.js"></script>
+  </head>
+
+  <body style='background-color: #f1c40f' ng-app="myApp">
+    <div id="top-bar" style="text-align: center">
+      <h1 style='text-align: center; cursor: pointer; display: inline-block' onclick="$('#redirector').attr('href', '#/'); $('#redirector')[0].click()">20 Flavors</h1>
+      <a id='redirector'></a>
+      <br>
+      <a id='openOrders' href='#/orders' style='float:right; margin-right: 20px' class='btn btn-success'>Orders<br><i class='fa fa-clipboard'></i></a>
+      <h3 id="budget" style='margin-right:10px; float: right'><b></b></h3>
+      <br><br>
+
+    </div>
+
+    <ng-view>
+    </ng-view>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/masonry/3.3.2/masonry.pkgd.min.js"></script>
+    <script src="https://dl.dropboxusercontent.com/u/374061708/fingerprint.js"></script>
+    <script>
+      var addFlavor = function(quantity,flavor,description,price)
+      {
+        var request = new XMLHttpRequest();
+        request.addEventListener('load', function()
+        {
+          returnedNewPost = JSON.parse(request.responseText)
+        });
+        request.open('POST', 'http://localhost:3000/addNewPost');
+        request.setRequestHeader('Content-type', 'application/json');
+        request.send(JSON.stringify({"quantity": quantity, "flavor": flavor, "description" : description, "price" : price}));
+      }
+      var updateBudgetAmount = function()
+      {
+        var request = new XMLHttpRequest();
+        request.addEventListener('load', function()
+        {
+          returnedUser = JSON.parse(request.responseText)
+          $("#budget").html("Budget: $" + returnedUser[0].budget.toFixed(2));
+        });
+        fingerprint = new Fingerprint().get();
+        request.open('GET', '/currentUser?visitorID=' + fingerprint);
+        request.setRequestHeader('Content-type', 'application/json');
+        request.send();
+      }
+      var hasVisited = function()
+      {
+        var fingerprint = new Fingerprint().get();
+        var request = new XMLHttpRequest();
+        request.addEventListener('load', function()
+        {
+          returnedUser = JSON.parse(request.responseText)
+          console.log(returnedUser);
+          if(returnedUser.length != 0)
+          {
+            $("#budget").html("Budget: $" + returnedUser[0].budget.toFixed(2));
+          }
+          else {
+            $("#budget").html("Budget: $100");
+          }
+        });
+        request.open('GET', '/currentUser?visitorID=' + fingerprint);
+        request.setRequestHeader('Content-type', 'application/json');
+        request.send();
+      }
+    </script>
+    <script>
+
+    var myApp = angular.module("myApp", ['ngRoute']);
+    myApp.config(function($sceDelegateProvider)
+    {
+      $sceDelegateProvider.resourceUrlWhitelist(['https://dl.dropboxusercontent.com/u/374061708/**', 'http://engr.uconn.edu/~gelyko/images/people_pic/anonymous.png','http://media.npr.org/assets/news/1659/10/27/facebook1_sq-17f6f5e06d5742d8c53576f7c13d5cf7158202a9.jpg?s=16','http://localhost:3000/**']);
+    });
+
+    myApp.config(function($routeProvider)
+    {
+      $routeProvider
+           .when('/',
+           {
+             controller: 'mainController',
+             templateUrl: '/listings.html',
+             controllerAs: 'main',
+             type: 'main'
+           })
+           .when('/orders',
+           {
+             controller: 'orderController',
+             templateUrl: '/orders.html'
+           })
+           .otherwise({
+             controller: 'mistakeController',
+             templateUrl: '/notfound.html'
+           })
+    });
+    myApp.controller('orderController', ['$route', '$scope', '$http', '$timeout',
+      function($route, $scope, $http, $timeout){
+        hasVisited();
+        updateBudgetAmount();
+        var fingerprint = new Fingerprint().get();
+        var orderID;
+
+        $scope.handleOrders = function()
+        {
+          $http.get("/api/orders?visitorID=" + fingerprint)
+          .success(function(response)
+          {
+            for(var i = 0; i < response.length; i++)
+            {
+              response[i].price = response[i].price.toFixed(2);
+            }
+            response.reverse();
+            $scope.orders = response;
+            if(response.length == 0)
+            {
+              $scope.ordersEmpty = "yes";
+            }
+            $timeout(function()
+            {
+              $(".refund").click(function(event)
+              {
+                fingerprint = new Fingerprint().get()
+                orderID = $(event.target).parent().attr('ng-id');
+                $http.post('/api/removeOrder', {'visitorID': fingerprint, 'orderID': orderID})
+                .success(function(response)
+                {
+                  $http.post('/api/refundMoney', {'visitorID': fingerprint, 'purchase': response.amount})
+                  .success(function(res)
+                  {
+                    $("#budget").html("Budget: $" + res.updatedAmount.toFixed(2));
+                    $scope.handleOrders();
+                  })
+                  $http.post('/api/updateQuantity', {'quantity': response.cups, 'flavor': response.flavor})
+                  .success(function(){
+                    console.log("quantity updated!");
+                  })
+                })
+              })
+              $("#orderHistory").css('visibility', "visible");
+              console.log('successful');
+            })
+          });
+        }
+        $scope.handleOrders();
+    }])
+    myApp.controller('mistakeController', ['$route', '$timeout',
+      function($route, $timeout){
+        $timeout(function()
+        {
+          $("#submitOrder").prop('disabled', true);
+          $("#openOrders").prop('disabled', true);
+        })
+    }])
+    myApp.controller('mainController', ['$route', '$scope', '$sce', '$http','$routeParams', '$timeout',
+      function($route, $scope, $sce, $http, $routeParams, $timeout) {
+        this.$route = $route;
+        this.$timeout = $timeout;
+        this.$routeParams = $routeParams;
+        $("#submitOrder").prop('disabled',false);
+        $("#openOrders").prop('disabled',false);
+        hasVisited();
+        updateBudgetAmount();
+        function populateOptions(flavors) {
+          $("select").html("")
+          flavors.map(function(flavor)
+          {
+            $("select").append("<option value='" + flavor.flavor + "'>" + flavor.flavor + "</option>");
+          });
+        }
+
+        function findFlavorObjectIndex(flavors, name)
+        {
+          for(var i = 0; i < flavors.length; i++)
+          {
+            if(name === flavors[i].flavor)
+            {
+              return i;
+            }
+          }
+        }
+        /* Processes orders for the given set of flavors. When a valid order is made,
+         * decrements the quantity of the associated flavor. */
+        function isValidQuantity(n) {
+           if(isNaN(n))
+           {
+             return false;
+           }
+           n = parseFloat(n);
+           return n % 1 === 0 && n > 0;
+        }
+        $scope.processOrders = function () {
+          $http.get('/allFlavours')
+          .success(function(response)
+          {
+            var fingerprint = new Fingerprint().get();
+            var flavors = JSON.parse(JSON.stringify(response));
+            $http.get("/currentUser?visitorID=" + fingerprint)
+            .success(function(response){
+              budget = response[0].budget;
+              $("#submitOrder").click(function(event)
+              {
+                event.preventDefault();
+                flavorObj = flavors[findFlavorObjectIndex(flavors, $("select").val())];
+                console.log(flavorObj)
+                if($("#amount").val() === "0")
+                {
+                  $("#errorMessage").html("There is no " + $("select").val() + " left!");
+                  $("#errorMessage").css('visibility','visible');
+                }
+                else if(!isValidQuantity($("#amount").val())){
+                  $("#errorMessage").html("Please enter a valid quantity");
+                  $("#errorMessage").css('visibility','visible');
+                }
+                else if(parseInt($("#amount").val()) > flavorObj.quantity)
+                {
+                  $("#errorMessage").html("There is not enough of the " + $("select").val() + " flavor to buy the quantity specified.");
+                  $("#errorMessage").css('visibility','visible');
+                }
+                else if(budget < flavorObj.price*parseInt($("#amount").val()))
+                {
+                  $("#errorMessage").html("You don't have enough money");
+                  $("#errorMessage").css('visibility','visible');
+                }
+                else {
+
+                  $("#errorMessage").css('visibility','hidden');
+                  $http.post("/updateFlavor", {'flavor': $("select").val(), 'bought': parseInt($("#amount").val())})
+                  .success(function(response)
+                  {
+                    var flavors = JSON.parse(JSON.stringify(response));
+                    for(var i = 0; i < response.length; i++)
+                    {
+                      response[i].price = "$" + response[i].price;
+                    }
+                    $scope.flavors = response;
+                    function safeApply(scope, fn) {
+                      (scope.$$phase || scope.$root.$$phase) ? fn() : scope.$apply();
+                    }
+                    safeApply($scope, function(){});
+                    $timeout(function()
+                    {
+                      var container = document.getElementById('container');
+                      highlightFlavors(flavors);
+                      var fingerprint = new Fingerprint().get();
+                      $http.post('/updateOrders', {'flavor': $("select").val(), 'cups': parseInt($("#amount").val()), 'price': parseInt($("#amount").val())*flavorObj.price, 'visitorID': fingerprint})
+                      .success(function(response)
+                      {
+                        $("#errorMessage").html("<span style='color: green'>Order Added Successfully!</span>")
+                      })
+                      .error(function(error)
+                      {
+                        console.log(error);
+                      });
+                      $http.post('/api/updateBudget', {visitorID: fingerprint, purchase: parseInt($("#amount").val())*flavorObj.price})
+                      .success(function(response){
+                        $("#budget").html("Budget: $" + response.budget.toFixed(2));
+                      });
+                      $("#errorMessage").css('visibility','visible');
+                     })
+                  });
+                }
+              });
+          });
+        });
+      }
+
+        /* Highlights flavors when clicked to make a simple favoriting system. */
+        function highlightFlavors(flavors) {
+          $(".flavor").click(function(event)
+          {
+            $(".flavor").removeClass("highlighted");
+            var target;
+            if($(event.target).hasClass("flavor"))
+            {
+              target = event.target
+            }
+            else if($(event.target).parent().hasClass("flavor"))
+            {
+              target = $(event.target).parent()[0];
+            }
+            else if($(event.target).parent().parent().hasClass("flavor"))
+            {
+              target = $(event.target).parent().parent()[0];
+            }
+            if($(target).hasClass("highlighted"))
+            {
+              $(target).removeClass("highlighted");
+            }
+            else {
+              $(target).addClass("highlighted");
+            }
+            $('select').val($(target).find(".description").find("h2").html());
+          })
+        }
+
+        $http.get('/allFlavours')
+        .success(function(response)
+        {
+          var flavors = JSON.parse(JSON.stringify(response));
+          for(var i = 0; i < response.length; i++)
+          {
+            response[i].price = "$" + response[i].price;
+          }
+          $scope.flavors = response;
+          function safeApply(scope, fn) {
+            (scope.$$phase || scope.$root.$$phase) ? fn() : scope.$apply();
+          }
+          safeApply($scope, function(){});
+          $timeout(function()
+          {
+            var container = document.getElementById('container');
+            populateOptions(flavors);
+            $scope.processOrders(flavors);
+            highlightFlavors(flavors);
+            $("#container").css('visibility', 'visible');
+          });
+        });
+    }]);
+    </script>
+  </body>
+</html>
